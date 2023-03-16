@@ -1,0 +1,22 @@
+# This is a boilerplate parameters config generated for pipeline 'data_processing'
+# using Kedro 0.18.4.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://kedro.readthedocs.io/en/0.18.4/kedro_project_setup/configuration.html#parameters
+
+concatenate_datasets_pipeline_train:
+  parameters:
+    features_dir: 'data/01_raw/train_input/moco_features'
+    metadata_path: 'data/01_raw/train_input/train_metadata.csv'
+    target_path: 'data/01_raw/train_input/train_output.csv'
+    mode: 'train'
+    
+
+concatenate_datasets_pipeline_test:
+  parameters:
+    features_dir: 'data/01_raw/test_input/moco_features'
+    metadata_path: 'data/01_raw/test_input/test_metadata.csv'
+    mode: 'test'
+
+umap:
+  umap_kwargs: {'n_components': 128}

@@ -1,0 +1,120 @@
+# Here you can define all your data sets by using simple YAML syntax.
+#
+# Documentation for this file format can be found in "The Data Catalog"
+# Link: https://kedro.readthedocs.io/en/stable/data/data_catalog.html
+
+## 01_raw
+train_metadata:
+    type: pandas.CSVDataSet
+    filepath: data/01_raw/train_input/train_metadata.csv
+
+## 02_intermediate
+# Train
+concatenated_datasets: 
+    type: pickle.PickleDataSet
+    filepath: data/02_intermediate/train/concatenated_datasets.pkl
+    backend: pickle
+concatenated_targets: 
+    type: pickle.PickleDataSet
+    filepath: data/02_intermediate/train/concatenated_targets.pkl
+    backend: pickle
+concatenated_indexs:
+    type: pickle.PickleDataSet
+    filepath: data/02_intermediate/train/concatenated_indexs.pkl
+    backend: pickle
+
+# Test
+concatenated_datasets_test: 
+    type: pickle.PickleDataSet
+    filepath: data/02_intermediate/test/concatenated_datasets.pkl
+    backend: pickle   
+concatenated_indexs_test:
+    type: pickle.PickleDataSet
+    filepath: data/02_intermediate/test/concatenated_indexs.pkl
+    backend: pickle 
+
+## 03_primary
+X_emb:
+    type: pickle.PickleDataSet
+    filepath: data/03_primary/train/X_emb.pkl
+    backend: pickle   
+X_emb_test:
+    type: pickle.PickleDataSet
+    filepath: data/03_primary/test/X_emb.pkl
+    backend: pickle  
+
+# y clusterd from first work
+y_clustered:
+    type: pickle.PickleDataSet
+    filepath: data/03_primary/y_clustered.pkl
+    backend: pickle  
+
+## 05_model_input
+# With embedding
+X_train_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/emb/X.pkl
+    backend: pickle   
+y_train_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/emb/y.pkl
+    backend: pickle   
+indexs_train_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/emb/indexs.pkl
+    backend: pickle   
+
+X_eval_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/emb/X.pkl
+    backend: pickle   
+y_eval_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/emb/y.pkl
+    backend: pickle   
+indexs_eval_emb:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/emb/indexs.pkl
+    backend: pickle       
+
+# y clusterd from first work
+y_clustered_train:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/y_clustered.pkl
+    backend: pickle  
+y_clustered_eval:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/y_clustered.pkl
+    backend: pickle  
+
+# Without embedding
+X_train:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/X.pkl
+    backend: pickle   
+y_train:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/y.pkl
+    backend: pickle   
+indexs_train:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/train/indexs.pkl
+    backend: pickle   
+
+X_eval:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/X.pkl
+    backend: pickle   
+y_eval:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/y.pkl
+    backend: pickle   
+indexs_eval:
+    type: pickle.PickleDataSet
+    filepath: data/05_model_input/eval/indexs.pkl
+    backend: pickle  
+## 06_models
+umap_mapper:
+    type: pickle.PickleDataSet
+    filepath: data/06_models/umap_mapper.pkl
+    backend: pickle 
