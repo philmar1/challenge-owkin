@@ -29,18 +29,59 @@ class NN_classifier(torch.nn.Module):
             self.linear_stack.append(nn.LeakyReLU())
             if dropout > 0:
                 self.linear_stack.append(nn.Dropout(dropout))
+        self.linear_stack.append(nn.Linear(hidden_layers_size[-1], 1))
     
     def forward(self, x):   
         # Feedforward
         for layer in self.linear_stack:
             x = layer(x)
-        output = torch.nn.Sigmoid()
+        output = torch.nn.Sigmoid()(x)
         return output
                 
                 
-    
-class AttentionSoftMax(torch.nn.Module):
-    def __init__(self, in_features = 3, out_features = None):
+class SimpleAttentionBlock(torch.nn.Module):
+    def __init__(self, input_dim = 3, embed_dim = None):
+        super(SimpleAttentionBlock, self).__init__()
+        self.att_block = nn.ModuleList()
+        if embed_dim is None:
+            embed_dim = input_dim
+        self.linear = nn.Linear(input_dim, embed_dim)
+        self.activation = nn.Tanh()
+        self.linear_last = nn.Linear(embed_dim, 1)
+        
+    def forward(self, x):
+        scores = self.linear(x)
+        scores = self.activation(scores)
+        scores = self.linear_last(scores)
+        scores = nn.Softmax(dim=-1)
+        return self.att_block(x)
+
+class GatedAttentionBlock(torch.nn.Module):
+    def __init__(self, input_dim = 3, embed_dim = None):
+        super(GatedAttentionBlock, self).__init__()
+        if embed_dim is None:
+            embed_dim = input_dim
+        self.linear_left = nn.Linear(input_dim, embed_dim)
+        self.linear_right = nn.Linear(input_dim, embed_dim)
+        self.activation_left = nn.Tanh()
+        self.activation_right = nn.Sigmoid()
+        self.linear_last = nn.Linear(embed_dim, 1)
+        
+    def forward(self, x):
+        right = self.linear_right(x)
+        right = self.activation_right(right)
+        left = self.linear_left(x)   
+        left = self.activation_left(left)
+        scores = right * left
+        scores = self.linear_last(scores)
+        attention_map = nn.Softmax(dim=-1)(scores)
+        
+        return attention_map   
+                              
+class AttentionModule(torch.nn.Module):
+    def __init__(self, input_dim = 3, 
+                 embed_dim = None,
+                 att = 'simple'):
         """
         given a tensor `x` with dimensions [N * M],
         where M -- dimensionality of the featur vector
@@ -49,39 +90,42 @@ class AttentionSoftMax(torch.nn.Module):
         initialize with `AggModule(M)`
         returns:
         - weighted result: [M]
-        - gate: [N]
+        - attention_map: [N]
         """
-        super(AttentionSoftMax, self).__init__()
-        if out_features is None:
-            out_features = in_features
-        self.linear_keys = nn.Linear(in_features, out_features)
-        self.linear_values = nn.Linear(in_features, out_features)
-        self.activation = nn.LeakyReLU()
-        self.layer_linear_query = nn.Linear(out_features, 1)
+        super(AttentionModule, self).__init__()
+        self.input_dim = input_dim
+        self.embed_dim = embed_dim
+        if att == 'simple':
+            self.att_block = SimpleAttentionBlock(input_dim, embed_dim) 
+        if att == 'gated':
+            self.att_block = GatedAttentionBlock(input_dim, embed_dim) 
         
     def forward(self, x):
-        keys = self.linear_keys(x)
-        keys = self.activation(keys)
-        values = self.linear_values(x)
-        values = self.activation(values)
-        attention_map_raw = self.layer_linear_query(keys)[...,0]
-        attention_map = nn.Softmax(dim=-1)(attention_map_raw)
-        result = torch.einsum(f'ki,kij->kj', attention_map, values) # torch.einsum(f'ki,kij->kj', attention_map, x)
+        attention_map = self.att_block(x)
+        attention_map = attention_map.reshape(attention_map.shape[0], attention_map.shape[1])
+        result = torch.einsum(f'ki,kij->kj', attention_map, x) # torch.einsum(f'ki,kij->kj', attention_map, x)
         return result, attention_map
     
-    
+
 class MIL_NN(torch.nn.Module):
     def __init__(self,
-                 agg = None,
+                 aggregator = None,
                  classifier = None,
+                 transformers_first = False
                 ):
         super(MIL_NN, self).__init__()
-        self.agg = agg
+        self.transformers_first = transformers_first
+        if self.transformers_first:
+            self.multihead_att = nn.MultiheadAttention(embed_dim=aggregator.input_dim,
+                                                  num_heads=8,
+                                                  batch_first=True)
+        self.aggregator = aggregator
         self.classifier = classifier
         
-
     def forward(self, bag_features):
-        bag_feature_agg, att_map = self.agg(bag_features)
+        if self.transformers_first:
+            bag_features, _ = self.multihead_att(bag_features, bag_features, bag_features)
+        bag_feature_agg, _ = self.aggregator(bag_features)
         y_pred = self.classifier(bag_feature_agg)
         return y_pred
         
