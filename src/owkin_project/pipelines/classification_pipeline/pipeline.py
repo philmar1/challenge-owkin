@@ -4,21 +4,11 @@ generated using Kedro 0.18.4
 """
 
 from kedro.pipeline import Pipeline, node, pipeline
-from .nodes import split_train_eval, get_train_eval_IDs
+from .utils import split_train_eval, get_train_eval_IDs, shuffleX
+from .train import *
+from .datamanager import *
 
-def create_pipeline(**kwargs) -> Pipeline:
-    old = pipeline([node(
-        func=split_train_eval,
-        inputs=['X_emb', 'concatenated_targets', 'concatenated_indexs', 'train_metadata'],
-        outputs= ['X_train_emb', 'y_train_emb', 'indexs_train_emb', 'X_eval_emb', 'y_eval_emb', 'indexs_eval_emb'],
-        name='split_train_eval_emb'
-    ),
-                    node(
-        func=split_train_eval,
-        inputs=['concatenated_datasets', 'concatenated_targets', 'concatenated_indexs', 'train_metadata'],
-        outputs= ['X_train', 'y_train', 'indexs_train', 'X_eval', 'y_eval', 'indexs_eval'],
-        name='split_train_eval'
-    )])
+def split_train_eval_pipeline(**kwargs) -> Pipeline:
 
     return pipeline([node(
         func=get_train_eval_IDs,
@@ -51,3 +41,77 @@ def create_pipeline(**kwargs) -> Pipeline:
         name='split_train_eval_yclustered'
     )
                     ])
+    
+def training_pipeline(**kwargs) -> Pipeline:
+    
+    return pipeline([node(
+        func=shuffleX,
+        inputs='X_train',
+        outputs='X_train_shuffled',
+        name='shuffleX'
+    ),
+                     node(
+        func=fit_scaler,
+        inputs='X_train',
+        outputs='scaler',
+        name='scale_train'
+    ),
+                     node(
+        func=get_dataset,
+        inputs=['X_train_shuffled',
+                'y_train',
+                'params:train.n_instances',
+                'scaler'],
+        outputs='train_dataset',
+        name='get_dataset_train'
+    ),
+                     
+                     node(
+        func=get_dataset,
+        inputs=['X_eval',
+                'y_eval',
+                'params:eval.n_instances',
+                'scaler'],
+        outputs='eval_dataset',
+        name='get_dataset_eval'
+    ),
+                     
+                     node(
+        func=get_dataloader,
+        inputs=['train_dataset',
+                'params:train.train_batch_size'],
+        outputs='train_dataloader',
+        name='get_dataloader_train'
+    ),
+                     
+                     node(
+        func=get_dataloader,
+        inputs=['eval_dataset',
+                'params:train.eval_batch_size'],
+        outputs='eval_dataloader',
+        name='get_dataloader_eval'
+    ),
+                     node(
+        func=get_model,
+        inputs=['params:model.att_block', 
+                'params:model.input_dim', 
+                'params:model.agg_embed_dim', 
+                'params:model.cl_hidden_layers_size',
+                'params:model.transformers_first'],
+        outputs='raw_model',
+        name='get_model'
+    ),
+                     node(
+        func=train,
+        inputs=['raw_model',
+                'train_dataloader',
+                'eval_dataloader', 
+                'params:train.hyperparameters'],
+        outputs='model',
+        name='train'
+    )
+    ])
+    
+def create_pipeline(**kwargs) -> Pipeline:
+    basic_pipeline = pipeline([])
+    return basic_pipeline

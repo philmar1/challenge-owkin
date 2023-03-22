@@ -47,11 +47,7 @@ def shuffleX(X, n=1000):
     X = X[[np.random.permutation(np.arange(i*n,(i+1)*n)) for i in range(0, len(X)//n)]]
     return X.reshape(-1, n_features)
 
-def get_MIL_X(X, y, n=1000):
-    assert 1000%n==0
-    return [(torch.tensor(X[i:i+n].astype(np.float32)), torch.tensor(y[i].astype(np.float32))) for i in range(0,len(X),n)]
-
-def augment_data(X, y, n_neg, n_pos):
+def create_new_bags(X, y, n_neg, n_pos):
     """combine features from different bags to create new instances
 
     Args:
@@ -75,19 +71,13 @@ def augment_data(X, y, n_neg, n_pos):
     
     return augmented_instances, augmented_lables
 
-def get_data_loaders(train_data, test_data, train_batch_size, val_batch_size):
-    train_loader = DataLoader(train_data, batch_size=train_batch_size, shuffle=True)
-    val_loader = DataLoader(test_data, batch_size=val_batch_size, shuffle=False)
-    return train_loader, val_loader
-
 def calculate_metric(metric_fn, true_y, pred_y):
     return metric_fn(true_y, pred_y)
     
 def print_scores(p, r, f1, a):
     # just an utility printing function
     for name, scores in zip(("precision", "recall", "F1", "accuracy"), (p, r, f1, a)):
-        logger.info(f"\t{name.rjust(14, ' ')}: {scores:.4f}")
-        
+        print(f"\t{name.rjust(14, ' ')}: {scores:.4f}")        
 
 # Model & others        
 def weighted_loss(weight):
@@ -106,33 +96,6 @@ def warmup_lr(lr: float, start_lr: float, end_lr: float, epoch_max: int)        
 def set_lr(lr: float):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    
-# %%
-if __name__ == '__main__':
-    X_train = catalog.load('X_train')
-    y_train = catalog.load('y_train')
-    indexs_train = catalog.load('indexs_train')
-
-    X_eval = catalog.load('X_eval')
-    y_eval = catalog.load('y_eval')
-    indexs_eval = catalog.load('indexs_eval')
-    
-    
-    # params:
-    n_features = 2048 #catalog.load('params:umap.umap_kwargs.n_components')
-    lr = catalog.load('params:learning_rate')
-    train_batch_size = catalog.load('params:train_batch_size')
-    val_batch_size = catalog.load('params:val_batch_size')
-    batch_size = catalog.load('params:batch_size')
-    positive_weight = 1/y_train.mean()
-    low_epoch_lr = 2
-    milestones=[low_epoch_lr, 10, 50, 100, 500]
-    gamma_start = 2
-    gamma = 0.9
-    epochs = 20
-
-
-# %%
 
 def get_optimizer(model, lr: float):
     return optim.Adam(model.parameters(), lr=lr)
@@ -189,7 +152,7 @@ def eval_epoch(model, loss_function, dataloader):
                     
         # calculate P/R/F1/A metrics for batch
         for acc, metric in zip((precision, recall, f1, accuracy), 
-                                   (precision_score, recall_score, f1_score, accuracy_score)):
+                                (precision_score, recall_score, f1_score, accuracy_score)):
             acc.append(metric(y_true, y_pred))
                 
     return total_loss/i, precision[0], recall[0], f1[0], accuracy[0]
@@ -221,22 +184,21 @@ def train(model, optimizer, train_loader, eval_loader, hyperarameters: Dict):
         
         model, train_loss = train_epoch(model, optimizer, loss_function, train_loader)
         val_loss, precision, recall, f1, accuracy = eval_epoch(model, loss_function, eval_loader)
-        logger.info(f"Epoch {epoch + 1}/{epochs}, lr {lr:.7f}, training loss: {train_loss/train_batches}, validation loss: {val_loss/eval_batches}")
+        print(f"Epoch {epoch + 1}/{epochs}, lr {lr:.7f}, training loss: {train_loss/train_batches}, validation loss: {val_loss/eval_batches}")
         
         print_scores(precision, recall, f1, accuracy)
         losses_train.append(train_loss/train_batches) # for plotting learning curve
         losses_val.append(val_loss/train_batches) # for plotting learning curve
         
-    logger.info(f"Training time: {time.time()-start_ts}s")
+    print(f"Training time: {time.time()-start_ts}s")
 
     return model
 
-
 class MILDataset(Dataset):
-    def __init__(self, X, y = None, scaler = None):
-        n_bags, n_instances, n_features = len(X)//1000, 1000, X.shape[-1]
+    def __init__(self, X, y = None, n_instances = 1000, scaler = None):
+        n_bags, n_features = len(X)//n_instances, X.shape[-1]
         self.X = X.reshape(n_bags, n_instances, n_features) # create n bags of 1000 instances of dim = n_features
-        self.y = y[[i*1000 for i in range(len(y)//1000)]]
+        self.y = y[[i*n_instances for i in range(len(y)//n_instances)]]
         self.scaler = scaler
         if scaler is not None:
             self.X = scaler.transform(self.X)
@@ -253,44 +215,54 @@ class MILDataset(Dataset):
 
 
 # %%
-scaler = StandardScaler()
-scaler.fit(X_train)
-device = "cpu"
+if __name__ == '__main__':
+    X_train = catalog.load('X_train')
+    y_train = catalog.load('y_train')
+    indexs_train = catalog.load('indexs_train')
 
+    X_eval = catalog.load('X_eval')
+    y_eval = catalog.load('y_eval')
+    indexs_eval = catalog.load('indexs_eval')
+    
+    
+    # params:
+    n_features = X_train.shape[-1] #catalog.load('params:umap.umap_kwargs.n_components')
+    train_batch_size = catalog.load('params:train_batch_size')
+    eval_batch_size = catalog.load('params:val_batch_size')
+    batch_size = catalog.load('params:batch_size')
 
-# %%
-n_train, n_test = 1000, 1000
-n_neg, n_pos = 0, 0
-X_train = shuffleX(X_train)
-X_train, y_train = augment_data(X_train, y_train, n_neg=n_neg, n_pos=n_pos)
-train_data = get_MIL_X(scaler.transform(X_train), y_train, n=n_train)
-eval_data = get_MIL_X(scaler.transform(X_eval), y_eval, n=n_test)
-train_loader, eval_loader = get_data_loaders(train_data, eval_data, train_batch_size, val_batch_size)
+    # %%
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+    device = "cpu"
+    # %%
+    n_train, n_test = 1000, 1000
+    n_neg, n_pos = 0, 0
+    #X_train = shuffleX(X_train)
+    #X_train, y_train = create_new_bags(X_train, y_train, n_neg=n_neg, n_pos=n_pos)
 
-# %%
-# model:
-hyperarameters = {'start_lr': 0.0000001,
-                  'end_lr': 0.0001,
-                  'warmup_epoch': 10,
-                  'epochs': 40,
-                  'positive_weight': 1.1,
-                  'gamma': 0.9,
-                  }
-out_features = 512
-aggregator = AttentionModule(input_dim=n_features, embed_dim=out_features, att='gated')
-classifier = NN_classifier(input_dim=n_features, hidden_layers_size = [out_features])
-model = MIL_NN(classifier=classifier, aggregator=aggregator, transformers_first=True)
+    train_data = MILDataset(X_train, y_train, n_instances=n_train, scaler=None)
+    eval_data = MILDataset(X_eval, y_eval, n_instances=n_test, scaler=None)
+    train_loader = DataLoader(train_data, batch_size=train_batch_size, shuffle=True)
+    eval_loader = DataLoader(eval_data, batch_size=eval_batch_size, shuffle=True)
+    # %%
+    # model:
+    hyperarameters = {'start_lr': 0.0000001,
+                    'end_lr': 0.0001,
+                    'warmup_epoch': 10,
+                    'epochs': 40,
+                    'positive_weight': 1.1,
+                    'gamma': 0.9,
+                    }
+    n_features = 2048
+    out_features = 128
+    aggregator = AttentionModule(input_dim=n_features, embed_dim=out_features, att='gated')
+    classifier = NN_classifier(input_dim=n_features, hidden_layers_size = [out_features])
+    model = MIL_NN(classifier=classifier, aggregator=aggregator, transformers_first=False)
 
-optimizer = optim.Adam(model.parameters(), lr=hyperarameters['start_lr'])
-scheduler = ExponentialLR(optimizer, gamma=0.9, verbose=True)
+    optimizer = optim.Adam(model.parameters(), lr=hyperarameters['start_lr'])
+    scheduler = ExponentialLR(optimizer, gamma=0.9, verbose=True)
 
-train(model, optimizer, train_loader, eval_loader, hyperarameters=hyperarameters)
+    # %%
+    train(model, optimizer, train_loader, eval_loader, hyperarameters=hyperarameters)
 
-
-# %%
-optimizer = optim.Adadelta(model.parameters(), lr=lr)
-#optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-#scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
-losses = []
-batches = len(train_loader)
-val_batches = len(eval_loader)
