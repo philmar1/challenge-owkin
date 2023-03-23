@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+    
+import logging 
 
+logger = logging.getLogger(__name__)
 
 class IClassifier(nn.Module):
     def __init__(self, feature_extractor, feature_size, output_class):
@@ -20,17 +23,17 @@ class IClassifier(nn.Module):
     
 
 class BClassifier(nn.Module):
-    def __init__(self, input_size, output_class, dropout_v=0.0, nonlinear=True, passing_v=False): # K, L, N
+    def __init__(self, input_size, output_class, embed_dim, dropout_v=0.0, nonlinear=True, passing_v=False): # K, L, N
         super(BClassifier, self).__init__()
         if nonlinear:
-            self.q = nn.Sequential(nn.Linear(input_size, 128), nn.ReLU(), nn.Linear(128, 128), nn.Tanh())
+            self.q = nn.Sequential(nn.Linear(input_size, embed_dim), nn.LeakyReLU(), nn.Linear(embed_dim, embed_dim), nn.Tanh())
         else:
-            self.q = nn.Linear(input_size, 128)
+            self.q = nn.Linear(input_size, embed_dim)
         if passing_v:
             self.v = nn.Sequential(
                 nn.Dropout(dropout_v),
                 nn.Linear(input_size, input_size),
-                nn.ReLU()
+                nn.LeakyReLU()
             )
         else:
             self.v = nn.Identity()
@@ -63,7 +66,17 @@ class BClassifier(nn.Module):
         C = C.view(batch_size, C.shape[1]) # batch x C
         
         return C, A, B 
+ 
+class MultiheadAttentionHook(nn.Module):
+    def __init__(self, input_dim, num_heads, batch_first = True) -> None:
+        super(MultiheadAttentionHook, self).__init__()  
+        self.multi_head_att = nn.MultiheadAttention(embed_dim=input_dim,
+                                                  num_heads=num_heads,
+                                                  batch_first=batch_first) 
     
+    def forward(self, x):
+        outputs, attn_weights = self.multi_head_att.forward(x, x, x)
+        return outputs
     
 class MILNet(nn.Module):
     def __init__(self, i_classifier, b_classifier):
@@ -76,3 +89,28 @@ class MILNet(nn.Module):
         prediction_bag, A, B = self.b_classifier(feats, classes)
         
         return classes, prediction_bag, A, B
+
+class DualStreamMILAggregator():
+     def __init__(self, i_classifier, b_classifier) -> None:
+         self.i_classifier = i_classifier
+         self.b_classifier = b_classifier
+     
+def get_model(input_dim = 2048,
+              embed_dim = 512,
+              dropout = 0.0, 
+              passing_v = False,
+              transformers_first = False
+              ):
+    
+    if transformers_first:
+        feature_extractor = MultiheadAttentionHook(input_dim=input_dim,
+                                                  num_heads=4,
+                                                  batch_first=True)
+    else:
+        feature_extractor = nn.Identity()
+        
+    i_classifier = IClassifier(feature_extractor=feature_extractor, feature_size=input_dim, output_class=1)
+    b_classifier = BClassifier(input_size=input_dim, output_class=1, embed_dim=embed_dim, dropout_v=dropout, passing_v=passing_v)
+    model = MILNet(i_classifier, b_classifier)
+    logger.info("Creating model: \n {} ".format(model))
+    return model

@@ -1,5 +1,5 @@
-from .model import *
-from .utils import *
+from .models.AttentionBased import CosineWarmupScheduler
+from .utils.utils import *
 
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 import torch
@@ -53,14 +53,10 @@ def train_epoch(model, optimizer, lr_scheduler, loss_function, dataloader):
         lr = optimizer.param_groups[0]['lr']
         
         X, y = data[0].to(device), data[1].to(device)
-        y = y.type(torch.FloatTensor)
         y = y.reshape(-1,1)
             
         # training step for single batch
         model.zero_grad() 
-            
-        #outputs = model(X) 
-        #loss = loss_function(outputs, y) 
         
         classes, bag_prediction, _, _ = model(X) # n X L
         max_prediction, index = torch.max(classes, 1)
@@ -98,13 +94,8 @@ def eval_epoch(model, loss_function, dataloader):
     with torch.no_grad():
         for i, data in progress:
             X, y = data[0].to(device), data[1].to(device)
-            y = y.type(torch.FloatTensor)
             y = y.reshape(-1,1)
-            #outputs = model(X) 
-            #total_loss += loss_function(outputs, y)
-            #predicted_classes = outputs.detach().round()
-            #y_pred.extend((predicted_classes).reshape(-1).tolist())
-            
+
             # MIL
             classes, bag_prediction, _, _ = model(X) 
             max_prediction, index = torch.max(classes, 1)
@@ -145,6 +136,7 @@ def train(model, train_loader, eval_loader, hyperparameters: Dict):
     start_ts = time.time()
     
     losses_train, losses_val = [], []
+    logger.info("Set device: {}".format(device))
     logger.info("Starting training with lr: {:.7f}".format(start_lr))
     for epoch in range(epochs):
         logger.info("Epoch {}/{}".format(epoch + 1, epochs))
@@ -161,7 +153,7 @@ def train(model, train_loader, eval_loader, hyperparameters: Dict):
         losses_train.append(train_loss/train_batches) # for plotting learning curve
         losses_val.append(val_loss/train_batches) # for plotting learning curve
         
-        print(f"Epoch {epoch + 1}/{epochs}, lr {lr:.10f}, training loss: {train_loss/train_batches}, validation loss: {val_loss/eval_batches}")
+        logger.info(f"Epoch {epoch + 1}/{epochs}, lr {lr:.10f}, training loss: {train_loss/train_batches}, validation loss: {val_loss/eval_batches}")
         print_scores(precision, recall, f1, accuracy)
         
         

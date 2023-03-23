@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn, optim
+from .DualStream import *
 import logging
 
 logger = logging.getLogger(__name__)
@@ -136,9 +137,6 @@ class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
             lr_factor *= epoch * 1.0 / self.warmup
         return lr_factor
    
-class DualStrimMILAggregator():
-     def __init__(self) -> None:
-         pass
      
 def get_model(att_block = 'gated',
               input_dim = 2048,

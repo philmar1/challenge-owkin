@@ -14,9 +14,16 @@ model:
   cl_hidden_layers_size: [512]
   transformers_first: True
 
+dual_stream_model:
+  input_dim: 2048
+  embed_dim: 512
+  dropout: 0.1
+  passing_v: True
+  transformers_first: True
+
 lr_scheduler:
   warmup: 100
-  max_iters: 2000
+  max_iters: 2000 
 
 train:
   n_instances: 1000

@@ -4,9 +4,10 @@ generated using Kedro 0.18.4
 """
 
 from kedro.pipeline import Pipeline, node, pipeline
-from .utils import split_train_eval, get_train_eval_IDs, shuffleX
 from .train import *
-from .datamanager import *
+from .utils.utils import split_train_eval, get_train_eval_IDs, shuffleX
+from .utils.datamanager import *
+from .models.DualStream import get_model
 
 def split_train_eval_pipeline(**kwargs) -> Pipeline:
 
@@ -93,11 +94,11 @@ def training_pipeline(**kwargs) -> Pipeline:
     ),
                      node(
         func=get_model,
-        inputs=['params:model.att_block', 
-                'params:model.input_dim', 
-                'params:model.agg_embed_dim', 
-                'params:model.cl_hidden_layers_size',
-                'params:model.transformers_first'],
+        inputs=['params:dual_stream_model.input_dim', 
+                'params:dual_stream_model.embed_dim', 
+                'params:dual_stream_model.dropout', 
+                'params:dual_stream_model.passing_v',
+                'params:dual_stream_model.transformers_first'],
         outputs='raw_model',
         name='get_model'
     ),
