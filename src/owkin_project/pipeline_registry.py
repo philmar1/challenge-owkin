@@ -30,7 +30,7 @@ def register_pipelines() -> Dict[str, Pipeline]:
     split_train_eval_pipeline = classification_pipeline.create_pipeline()
     pipelines['split_train_eval_pipeline'] = split_train_eval_pipeline
     
-    # Training pipelone
+    # Training pipeline
     training_pipeline = classification_pipeline.training_pipeline()
     pipelines['training_pipeline'] = training_pipeline
     

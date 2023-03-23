@@ -70,7 +70,7 @@ class GatedAttentionBlock(torch.nn.Module):
         
         return attention_map   
                               
-class AttentionModule(torch.nn.Module):
+class AttentionModuleAggregator(torch.nn.Module):
     def __init__(self, input_dim = 3, 
                  embed_dim = None,
                  att_block = 'simple'):
@@ -84,7 +84,7 @@ class AttentionModule(torch.nn.Module):
         - weighted result: [M]
         - attention_map: [N]
         """
-        super(AttentionModule, self).__init__()
+        super(AttentionModuleAggregator, self).__init__()
         self.input_dim = input_dim
         self.embed_dim = embed_dim
         if att_block == 'simple':
@@ -135,7 +135,11 @@ class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
         if epoch <= self.warmup:
             lr_factor *= epoch * 1.0 / self.warmup
         return lr_factor
-    
+   
+class DualStrimMILAggregator():
+     def __init__(self) -> None:
+         pass
+     
 def get_model(att_block = 'gated',
               input_dim = 2048,
               agg_embed_dim = 1024,
@@ -143,7 +147,7 @@ def get_model(att_block = 'gated',
               transformers_first = False
               ):
     
-    aggregator = AttentionModule(input_dim=input_dim, embed_dim=agg_embed_dim, att_block=att_block)
+    aggregator = AttentionModuleAggregator(input_dim=input_dim, embed_dim=agg_embed_dim, att_block=att_block)
     classifier = NN_classifier(input_dim=input_dim, hidden_layers_size=cl_hidden_layers_size)
     model = MIL_NN(classifier=classifier, aggregator=aggregator, transformers_first=transformers_first)
     logger.info("Creating model: \n {} ".format(model))

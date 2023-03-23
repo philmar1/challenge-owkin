@@ -59,8 +59,16 @@ def train_epoch(model, optimizer, lr_scheduler, loss_function, dataloader):
         # training step for single batch
         model.zero_grad() 
             
-        outputs = model(X) 
-        loss = loss_function(outputs, y) 
+        #outputs = model(X) 
+        #loss = loss_function(outputs, y) 
+        
+        classes, bag_prediction, _, _ = model(X) # n X L
+        max_prediction, index = torch.max(classes, 1)
+        loss_bag = loss_function(bag_prediction, y)
+        loss_max = loss_function(max_prediction, y)
+        loss_total = 0.5*loss_bag + 0.5*loss_max
+        loss = loss_total.mean()
+    
         loss.backward() 
         optimizer.step() 
         #lr_scheduler.step()
@@ -92,10 +100,19 @@ def eval_epoch(model, loss_function, dataloader):
             X, y = data[0].to(device), data[1].to(device)
             y = y.type(torch.FloatTensor)
             y = y.reshape(-1,1)
-            outputs = model(X) 
-            prediced_classes = outputs.detach().round()
-            total_loss += loss_function(outputs, y)
-            y_pred.extend(prediced_classes.reshape(-1).tolist())
+            #outputs = model(X) 
+            #total_loss += loss_function(outputs, y)
+            #predicted_classes = outputs.detach().round()
+            #y_pred.extend((predicted_classes).reshape(-1).tolist())
+            
+            # MIL
+            classes, bag_prediction, _, _ = model(X) 
+            max_prediction, index = torch.max(classes, 1)
+            loss_bag = loss_function(bag_prediction, y)
+            loss_max = loss_function(max_prediction, y)
+            total_loss += 0.5*loss_bag + 0.5*loss_max
+            y_pred.extend((bag_prediction.reshape(-1) > 0.5).tolist())
+            
             y_true.extend(y.reshape(-1).tolist())
                     
             # updating progress bar
@@ -121,8 +138,8 @@ def train(model, train_loader, eval_loader, hyperparameters: Dict):
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    loss_function = nn.BCELoss(reduction='mean') #weighted_loss(weight=positive_weight)
-    
+    #loss_function = nn.BCELoss(reduction='mean') #weighted_loss(weight=positive_weight)
+    loss_function = nn.BCEWithLogitsLoss(None)
     train_batches = len(train_loader)
     eval_batches = len(eval_loader)
     start_ts = time.time()
