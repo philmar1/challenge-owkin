@@ -18,7 +18,7 @@ class MILDataset(Dataset):
         features = self.X[idx,:,:]
         target = None
         if self.y is not None:
-            target = self.y[idx*self.n_instances]
+            target = float(self.y[idx*self.n_instances])
         return features, target 
 
 def get_dataset(X, y = None, n_instances: int = 1000, scaler = None) -> MILDataset:   

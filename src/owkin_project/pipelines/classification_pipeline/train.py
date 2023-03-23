@@ -53,7 +53,6 @@ def train_epoch(model, optimizer, lr_scheduler, loss_function, dataloader):
         lr = optimizer.param_groups[0]['lr']
         
         X, y = data[0].to(device), data[1].to(device)
-        y = y.type(torch.FloatTensor)
         y = y.reshape(-1,1)
             
         # training step for single batch
@@ -90,7 +89,6 @@ def eval_epoch(model, loss_function, dataloader):
     with torch.no_grad():
         for i, data in progress:
             X, y = data[0].to(device), data[1].to(device)
-            y = y.type(torch.FloatTensor)
             y = y.reshape(-1,1)
             outputs = model(X) 
             prediced_classes = outputs.detach().round()
