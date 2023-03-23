@@ -4,7 +4,7 @@
 # Documentation for this file format can be found in "Parameters"
 # Link: https://kedro.readthedocs.io/en/0.18.4/kedro_project_setup/configuration.html#parameters
 
-concatenate_datasets_pipeline_train:
+concatenate_datasets_pipeline:
   parameters:
     features_dir: 'data/01_raw/train_input/moco_features'
     metadata_path: 'data/01_raw/train_input/train_metadata.csv'

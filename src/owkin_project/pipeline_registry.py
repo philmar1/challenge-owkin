@@ -18,16 +18,16 @@ def register_pipelines() -> Dict[str, Pipeline]:
     
     # Concatenate pipeline
     data_processing_pipeline, data_processing_pipeline_test = data_processing.concatenate_pipeline()
-    pipelines["data_processing_train"] = data_processing_pipeline
+    pipelines["data_processing"] = data_processing_pipeline
     pipelines["data_processing_test"] = data_processing_pipeline_test
-    pipelines["data_processing"] = data_processing_pipeline + data_processing_pipeline_test
+    pipelines["data_processing_complete"] = data_processing_pipeline + data_processing_pipeline_test
     
     # Embed pipeline
     umap_embedding_pipeline = data_processing.embedding_pipeline()
     pipelines["umap_embedding_pipeline"] = umap_embedding_pipeline
     
     # Spliting pipeline
-    split_train_eval_pipeline = classification_pipeline.create_pipeline()
+    split_train_eval_pipeline = classification_pipeline.split_train_eval_pipeline()
     pipelines['split_train_eval_pipeline'] = split_train_eval_pipeline
     
     # Training pipelone
