@@ -8,6 +8,7 @@ from .train import *
 from .utils.utils import split_train_eval, get_train_eval_IDs, shuffleX
 from .utils.datamanager import *
 from .models.DualStream import get_model
+from .models.Classifier import get_instance_classifier
 
 def split_train_eval_pipeline(**kwargs) -> Pipeline:
 
@@ -43,36 +44,102 @@ def split_train_eval_pipeline(**kwargs) -> Pipeline:
     )
                     ])
     
-def training_pipeline(**kwargs) -> Pipeline:
-    
+def prepare_data_pipeline(**kwargs) -> Pipeline:
     return pipeline([node(
-        func=shuffleX,
-        inputs='X_train',
-        outputs='X_train_shuffled',
-        name='shuffleX'
+        func=fit_scaler,
+        inputs=['X_train', 'indexs_train'],
+        outputs='scaler',
+        name='fit_scaler'
     ),
                      node(
-        func=fit_scaler,
-        inputs='X_train',
-        outputs='scaler',
+        func=scale,
+        inputs=['X_train', 'indexs_train', 'scaler'],
+        outputs='X_train_scaled',
         name='scale_train'
     ),
                      node(
-        func=get_dataset,
+        func=scale,
+        inputs=['X_eval', 'indexs_eval', 'scaler'],
+        outputs='X_eval_scaled',
+        name='scale_eval'
+    ),
+                     node(
+        func=shuffleX,
+        inputs='X_train_scaled',
+        outputs='X_train_shuffled',
+        name='shuffleX'
+    )
+    ])
+    
+def training_instance_classifier_pipeline(**kwargs) -> Pipeline:
+    return pipeline([ node(
+        func=get_InstanceDataset,
+        inputs=['X_train_shuffled',
+                'y_clustered_train'], ## TODO: PUT Y_CLUSTERED
+        outputs='train_instance_dataset',
+        name='get_instance_dataset_train'
+    ),
+                     
+                     node(
+        func=get_InstanceDataset,
+        inputs=['X_eval',
+                'y_clustered_eval'],
+        outputs='eval_instance_dataset',
+        name='get_instance_dataset_eval'
+    ),
+                     
+                     node(
+        func=get_dataloader,
+        inputs=['train_instance_dataset',
+                'params:instance_classifier_train.train_batch_size'],
+        outputs='train_instance_dataloader',
+        name='get_instance_dataloader_train'
+    ),
+                     
+                     node(
+        func=get_dataloader,
+        inputs=['eval_instance_dataset',
+                'params:instance_classifier_train.eval_batch_size'],
+        outputs='eval_instance_dataloader',
+        name='get_instance_dataloader_eval'
+    ),
+                     node(
+        func=get_instance_classifier,
+        inputs=['params:instance_classifier.input_dim',
+                'params:instance_classifier.cl_hidden_layers_size',
+                'params:instance_classifier.dropout',
+                'params:instance_classifier.end_activation'],
+        outputs='raw_instance_classifier',
+        name='get_instance_classifier'
+    ),
+                     node(
+        func=train,
+        inputs=['raw_instance_classifier',
+                'train_instance_dataloader',
+                'eval_instance_dataloader', 
+                'params:train.hyperparameters'],
+        outputs='instance_classifier',
+        name='train_instance_classifier'                  
+    )
+                     ])
+
+def training_pipeline(**kwargs) -> Pipeline:
+    return pipeline([ node(
+        func=get_MILDataset,
         inputs=['X_train_shuffled',
                 'y_train',
-                'params:train.n_instances',
-                'scaler'],
+                'params:train.n_instances'],
+                #'scaler'],
         outputs='train_dataset',
         name='get_dataset_train'
     ),
                      
                      node(
-        func=get_dataset,
+        func=get_MILDataset,
         inputs=['X_eval',
                 'y_eval',
-                'params:eval.n_instances',
-                'scaler'],
+                'params:eval.n_instances'],
+                #'scaler'],
         outputs='eval_dataset',
         name='get_dataset_eval'
     ),
@@ -98,7 +165,9 @@ def training_pipeline(**kwargs) -> Pipeline:
                 'params:dual_stream_model.embed_dim', 
                 'params:dual_stream_model.dropout', 
                 'params:dual_stream_model.passing_v',
-                'params:dual_stream_model.transformers_first'],
+                'params:dual_stream_model.transformers_first',
+                'params:dual_stream_model.instance_classifier'],
+                #'instance_classifier'],
         outputs='raw_model',
         name='get_model'
     ),

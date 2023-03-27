@@ -10,42 +10,25 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR
 from tqdm.autonotebook import tqdm
 
-from src.owkin_project.pipelines.classification_pipeline.model import *
-from src.owkin_project.pipelines.classification_pipeline.utils import *
-from src.owkin_project.pipelines.classification_pipeline.datamanager import *
+from src.owkin_project.pipelines.classification_pipeline.models.DualStream import *
+from src.owkin_project.pipelines.classification_pipeline.utils.utils import *
+from src.owkin_project.pipelines.classification_pipeline.utils.datamanager import *
 from src.owkin_project.pipelines.classification_pipeline.train import *
-from src.owkin_project.pipelines.classification_pipeline.MIL import *
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from sklearn.preprocessing import StandardScaler
-
-from sklearn import metrics as mtx
-from sklearn import model_selection as ms
-
 
 import random
 random.seed(10000)
 
 from typing import Dict
-from itertools import chain
-import time
 
-import logging
 import warnings
 warnings.filterwarnings("ignore")
+# %%
 
 %load_ext kedro.extras.extensions.ipython
 %reload_ext kedro.extras.extensions.ipython
 catalog = catalog 
-
-logging.basicConfig(filename='log.txt',
-                    filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-# %%
 
 def create_new_bags(X, y, n_neg, n_pos):
     """combine features from different bags to create new instances
@@ -103,14 +86,14 @@ if __name__ == '__main__':
     # %%
     # model:
     input_size = 2048
-    feature_size = 128
+    embed_dim = 128
     output_class = 1
     feature_extractor = nn.Sequential(
-                nn.Linear(input_size, feature_size),
+                nn.Linear(input_size, embed_dim),
                 nn.ReLU()
             )
-    i_classifier = IClassifier(feature_extractor, feature_size, output_class)
-    b_classifier = BClassifier(feature_size, output_class)
+    i_classifier = IClassifier(feature_extractor, input_size, output_class)
+    b_classifier = BClassifier(input_size, output_class, embed_dim=embed_dim)
     model = MILNet(i_classifier, b_classifier)
     
     X = torch.randn((3,100,input_size))

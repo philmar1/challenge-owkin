@@ -8,17 +8,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 class IClassifier(nn.Module):
-    def __init__(self, feature_extractor, feature_size, output_class):
+    def __init__(self, feature_extractor, feature_size, output_class, instance_classifier = None):
         super(IClassifier, self).__init__()
         
         self.feature_extractor = feature_extractor      
-        self.fc = nn.Linear(feature_size, output_class)
+        self.instance_classifier = instance_classifier
+        if instance_classifier == None:
+            self.instance_classifier = nn.Linear(feature_size, output_class)
         
         
     def forward(self, x):
-        device = x.device
         feats = self.feature_extractor(x) # N x K
-        c = self.fc(feats) # N x C
+        c = self.instance_classifier(feats) # N x C
         return feats, c
     
 
@@ -26,7 +27,10 @@ class BClassifier(nn.Module):
     def __init__(self, input_size, output_class, embed_dim, dropout_v=0.0, nonlinear=True, passing_v=False): # K, L, N
         super(BClassifier, self).__init__()
         if nonlinear:
-            self.q = nn.Sequential(nn.Linear(input_size, embed_dim), nn.LeakyReLU(), nn.Linear(embed_dim, embed_dim), nn.Tanh())
+            self.q = nn.Sequential(nn.Linear(input_size, embed_dim), 
+                                   nn.LeakyReLU(), 
+                                   nn.Linear(embed_dim, embed_dim), 
+                                   nn.Tanh())
         else:
             self.q = nn.Linear(input_size, embed_dim)
         if passing_v:
@@ -78,28 +82,25 @@ class MultiheadAttentionHook(nn.Module):
         outputs, attn_weights = self.multi_head_att.forward(x, x, x)
         return outputs
     
-class MILNet(nn.Module):
+class DualStreamNet(nn.Module):
     def __init__(self, i_classifier, b_classifier):
-        super(MILNet, self).__init__()
+        super(DualStreamNet, self).__init__()
         self.i_classifier = i_classifier
         self.b_classifier = b_classifier
+        self.name = 'DualStreamNet'
         
     def forward(self, x):
         feats, classes = self.i_classifier(x)
         prediction_bag, A, B = self.b_classifier(feats, classes)
         
         return classes, prediction_bag, A, B
-
-class DualStreamMILAggregator():
-     def __init__(self, i_classifier, b_classifier) -> None:
-         self.i_classifier = i_classifier
-         self.b_classifier = b_classifier
      
 def get_model(input_dim = 2048,
               embed_dim = 512,
               dropout = 0.0, 
               passing_v = False,
-              transformers_first = False
+              transformers_first = False,
+              instance_classifier = None
               ):
     
     if transformers_first:
@@ -109,8 +110,8 @@ def get_model(input_dim = 2048,
     else:
         feature_extractor = nn.Identity()
         
-    i_classifier = IClassifier(feature_extractor=feature_extractor, feature_size=input_dim, output_class=1)
+    i_classifier = IClassifier(feature_extractor=feature_extractor, feature_size=input_dim, output_class=1, instance_classifier=instance_classifier)
     b_classifier = BClassifier(input_size=input_dim, output_class=1, embed_dim=embed_dim, dropout_v=dropout, passing_v=passing_v)
-    model = MILNet(i_classifier, b_classifier)
+    model = DualStreamNet(i_classifier, b_classifier)
     logger.info("Creating model: \n {} ".format(model))
     return model
